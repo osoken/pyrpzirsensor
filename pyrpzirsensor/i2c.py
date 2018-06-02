@@ -316,6 +316,9 @@ class BME280(I2CSensorBase):
             (data[6] << 8) + data[7]
         )
 
+    def attributes(self):
+        return ('pressure', 'temperature', 'humidity')
+
     def values(self):
         (adc_p, adc_t, adc_h) = self.get_adc()
         t_fine = self.get_t_fine(adc_t)
