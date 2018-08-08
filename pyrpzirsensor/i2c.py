@@ -360,9 +360,9 @@ class TSL2561(I2CSensorBase):
         return self.get_illuminance()
 
 
-class ComplexSensor(object):
+class CompositeSensor(object):
     def __init__(self, *sensors):
-        super(ComplexSensor, self).__init__()
+        super(CompositeSensor, self).__init__()
         self.__sensors = []
         self.__register_sensors(sensors)
 
