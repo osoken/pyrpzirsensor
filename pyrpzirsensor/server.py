@@ -27,6 +27,7 @@ def gen_app(config_object=None):
     bme.set_inactive_duration(app.config['BME280_INACTIVE_DURATION'])
 
     sensor = ComplexSensor(
+        bme,
         TSL2561(app.config['TSL2561_ADDRESS'])
     )
 
