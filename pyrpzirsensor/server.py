@@ -24,7 +24,7 @@ def gen_app(config_object=None):
     bme.set_temperature_oversampling(
         app.config['BME280_TEMPERATURE_OVERSAMPLING']
     )
-    bme.set_inactive_duration(app.config['BME280BME280_INACTIVE_DURATION'])
+    bme.set_inactive_duration(app.config['BME280_INACTIVE_DURATION'])
 
     sensor = ComplexSensor(
         TSL2561(app.config['TSL2561_ADDRESS'])
