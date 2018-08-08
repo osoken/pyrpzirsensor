@@ -16,8 +16,17 @@ def gen_app(config_object=None):
     if config_object is not None:
         app.config.update(**config_object)
 
+    bme = BME280(app.config['BME280_ADDRESS'])
+    bme.set_mode(app.config['BME280_MODE'])
+    bme.set_filter(app.config['BME280_FILTER'])
+    bme.set_humidity_oversampling(app.config['BME280_HUMIDITY_OVERSAMPLING'])
+    bme.set_pressure_oversampling(app.config['BME280_PRESSURE_OVERSAMPLING'])
+    bme.set_temperature_oversampling(
+        app.config['BME280_TEMPERATURE_OVERSAMPLING']
+    )
+    bme.set_inactive_duration(app.config['BME280BME280_INACTIVE_DURATION'])
+
     sensor = ComplexSensor(
-        BME280(app.config['BME280_ADDRESS']),
         TSL2561(app.config['TSL2561_ADDRESS'])
     )
 
