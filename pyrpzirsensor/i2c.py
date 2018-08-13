@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from time import sleep
 from abc import ABCMeta, abstractmethod
 from collections import Iterable
 
@@ -335,12 +336,20 @@ class TSL2561(I2CSensorBase):
 
     :param i2c_addr_: I2C address
     """
+
+    gain_bits_map = util.BidirectionalMultiDict((
+        (1, 0), (16, 1)
+    ))
+    time_bits_map = util.BidirectionalMultiDict((
+        (13.7, 0), (101, 1), (402, 2)
+    ))
+
     def __init__(self, i2c_addr_):
         super(TSL2561, self).__init__(i2c_addr_)
 
-    def read_address(self, addr_, length_, default_=0):
+    def read_address(self, addr_, length_):
         return super(TSL2561, self).read_address(
-            addr_ | 0x80, length_, default_
+            addr_ | 0x80, length_
         )
 
     def write_address(self, addr_, data_):
@@ -350,10 +359,94 @@ class TSL2561(I2CSensorBase):
         return ('illuminance', )
 
     def values(self):
-        return (0.0, )
+        return (self.get_illuminance(), )
 
-    def get_illuminance(self):
-        return 0.0
+    def get_illuminance(self, adc=None, params=None):
+        if adc is None:
+            return self.get_illuminance(*self.get_adc())
+
+        ratio = adc[1] / adc[0]
+        if ratio <= 0.5:
+            lux = 0.0304 * adc[0] - (0.062 * adc[0] * (ratio ** 1.4))
+        elif ratio <= 0.61:
+            lux = 0.0224 * adc[0] - 0.031 * adc[1]
+        elif ratio <= 0.8:
+            lux = 0.0128 * adc[0] - 0.0153 * adc[1]
+        elif ratio <= 1.3:
+            lux = 0.00146 * adc[0] - 0.00112 * adc[1]
+        else:
+            lux = 0
+
+        return lux * 16 / params[0] * 402 / params[1]
+
+    def integrate(self, gain, time):
+        self.power_off()
+        self.set_params(gain, time)
+        self.power_on()
+        sleep(time * 0.0011)
+        data = self.read_address(0xC, 4)
+        self.power_off()
+        return ((data[1] << 8) | data[0], (data[3] << 8) | data[2])
+
+    def get_adc(self):
+        gain = 16
+        time = 101
+
+        while True:
+            buf = self.integrate(gain, time)
+            if buf[0] > 37000 or buf[1] > 37000:
+                if gain == 16 and time == 101:
+                    gain = 1
+                else:
+                    break
+            elif buf[0] < 300 or buf[1] < 300:
+                if gain == 16 and time == 101:
+                    time = 402
+                else:
+                    break
+            else:
+                break
+        return (buf, (gain, time))
+
+    def is_on(self):
+        return self.read_address_single(0) != 0
+
+    def power_on(self):
+        self.write_address_single(0, 0x03)
+
+    def power_off(self):
+        self.write_address_single(0, 0)
+
+    def get_gain(self):
+        return self.gain_bits_map.inverse[self.read_address_single(1) >> 4]
+
+    def get_time(self):
+        return self.time_bits_map.inverse[self.read_address_single(1) & 0x0F]
+
+    def get_params(self):
+        """returns (gain, time)
+        """
+        buf = self.read_address_single(1)
+        return (
+            self.gain_bits_map.inverse[buf >> 4],
+            self.time_bits_map.inverse[buf & 0x0F]
+        )
+
+    def set_gain(self, gain):
+        self.params(gain, self.get_time())
+
+    def set_time(self, time_):
+        self.params(self.get_gain(), time_)
+
+    def set_params(self, gain, time_):
+        """set gain and time simultaneously.
+
+        :param gain: must be `1` or `16`
+        :param time: must be one of `13.7`, `101` and `402`
+        """
+        self.write_address_single(
+            1, (self.gain_bits_map[gain] << 4) | self.time_bits_map[time_]
+        )
 
     @property
     def illuminance(self):
