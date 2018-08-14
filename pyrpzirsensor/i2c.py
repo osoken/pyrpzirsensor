@@ -366,6 +366,9 @@ class TSL2561(I2CSensorBase):
         if adc is None:
             return self.get_illuminance(*self.get_adc())
 
+        if adc[0] == 0:
+            return 0.0
+
         ratio = adc[1] / adc[0]
         if ratio <= 0.5:
             lux = 0.0304 * adc[0] - (0.062 * adc[0] * (ratio ** 1.4))
