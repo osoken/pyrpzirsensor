@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from threading import Thread
 from time import sleep
 from abc import ABCMeta, abstractmethod
 from collections import Iterable
@@ -451,6 +452,28 @@ class TSL2561(I2CSensorBase):
     @property
     def illuminance(self):
         return self.get_illuminance()
+
+
+class ThreadedTSL2561(TSL2561, Thread):
+    def __init__(self, i2c_addr_):
+        TSL2561.__init__(self, i2c_addr_)
+        Thread.__init__(self)
+        (adc, params) = super(ThreadedTSL2561, self).get_adc()
+        self.__latest_value = super(ThreadedTSL2561, self).get_illuminance(
+            adc, params
+        )
+        self.start()
+
+    def get_illuminance(self, adc=None, params=None):
+        return self.__latest_value
+
+    def run(self):
+        while True:
+            (adc, params) = super(ThreadedTSL2561, self).get_adc()
+            self.__latest_value = super(ThreadedTSL2561, self).get_illuminance(
+                adc, params
+            )
+            sleep(1)
 
 
 class CompositeSensor(object):

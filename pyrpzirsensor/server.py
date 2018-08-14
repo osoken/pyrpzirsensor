@@ -5,7 +5,7 @@ import time
 
 from flask import Flask, jsonify
 
-from . i2c import CompositeSensor, BME280, TSL2561
+from . i2c import CompositeSensor, BME280, ThreadedTSL2561
 
 
 def gen_app(config_object=None):
@@ -28,7 +28,7 @@ def gen_app(config_object=None):
 
     sensor = CompositeSensor(
         bme,
-        TSL2561(app.config['TSL2561_ADDRESS'])
+        ThreadedTSL2561(app.config['TSL2561_ADDRESS'])
     )
 
     @app.route('/api/temperature')
