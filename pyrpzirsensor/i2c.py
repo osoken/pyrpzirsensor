@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from collections import OrderedDict
 from threading import Thread
 from time import sleep
 from abc import ABCMeta, abstractmethod
@@ -480,7 +481,7 @@ class ThreadedTSL2561(TSL2561, Thread):
 
 
 class CompositeSensor(object):
-    def __init__(self, *sensors):
+    def __init__(self, sensors):
         super(CompositeSensor, self).__init__()
         self.__sensors = []
         self.__register_sensors(sensors)
@@ -506,3 +507,36 @@ class CompositeSensor(object):
             if attr in s.attributes():
                 return s[attr]
         raise KeyError(attr)
+
+
+class ThreadedCompositeSensor(CompositeSensor, Thread):
+    def __init__(self, sensors, hook=None):
+        CompositeSensor.__init__(self, sensors)
+        Thread.__init__(self)
+        self.__renew()
+        self.__hook = hook if hook is not None else lambda v: None
+        self.start()
+
+    def __renew(self):
+        self.__latest_values = OrderedDict(zip(
+            super(ThreadedCompositeSensor, self).attributes(),
+            super(ThreadedCompositeSensor, self).values()
+        ))
+
+    def attributes(self):
+        return self.__latest_values.keys()
+
+    def values(self):
+        return self.__latest_values.values()
+
+    def __getitem__(self, attr):
+        if attr in self.__latest_values:
+            return self.__latest_values[attr]
+        else:
+            raise KeyError(attr)
+
+    def run(self):
+        while True:
+            self.__renew()
+            self.__hook(self.__latest_values)
+            sleep(1)

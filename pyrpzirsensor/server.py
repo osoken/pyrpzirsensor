@@ -2,13 +2,22 @@
 
 import os
 import time
+import json
+from logging.config import dictConfig
+
 
 from flask import Flask, jsonify
 
-from . i2c import CompositeSensor, BME280, ThreadedTSL2561
+from . i2c import ThreadedCompositeSensor, BME280, TSL2561
 
 
-def gen_app(config_object=None):
+def gen_app(config_object=None, logsetting_file=None):
+    if logsetting_file is not None:
+        with open(logsetting_file, 'r') as fin:
+            dictConfig(json.load(fin))
+    elif os.getenv('PYRPZIRSENSOR_LOGGER') is not None:
+        with open(os.getenv('PYRPZIRSENSOR_LOGGER'), 'r') as fin:
+            dictConfig(json.load(fin))
     app = Flask(__name__)
     app.config.from_object('pyrpzirsensor.config')
     if os.getenv('PYRPZIRSENSOR') is not None:
@@ -26,10 +35,10 @@ def gen_app(config_object=None):
     )
     bme.set_inactive_duration(app.config['BME280_INACTIVE_DURATION'])
 
-    sensor = CompositeSensor(
+    sensor = ThreadedCompositeSensor((
         bme,
-        ThreadedTSL2561(app.config['TSL2561_ADDRESS'])
-    )
+        TSL2561(app.config['TSL2561_ADDRESS'])
+    ), lambda v: app.logger.info('sensor value.', extra=v))
 
     @app.route('/api/temperature')
     def api_temperature():
