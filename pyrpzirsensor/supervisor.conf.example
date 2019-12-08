@@ -1,0 +1,7 @@
+[program:pyrpzirsensor]
+command=python3 -m pyrpzirsensor
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/home/pi/app/pyrpzirsensor.log
+user=pi
+environment = PYRPZIRSENSOR="/home/pi/app/app.conf",PYRPZIRSENSOR_LOGGER="/home/pi/app/logstash.conf.json"
