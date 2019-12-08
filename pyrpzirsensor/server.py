@@ -8,7 +8,7 @@ from logging.config import dictConfig
 
 from flask import Flask, jsonify
 
-from . i2c import ThreadedCompositeSensor, BME280, TSL2561
+from . i2c import ThreadedCompositeSensor, BME280, TSL2561, TSL2572
 
 
 def gen_app(config_object=None, logsetting_file=None):
@@ -35,9 +35,18 @@ def gen_app(config_object=None, logsetting_file=None):
     )
     bme.set_inactive_duration(app.config['BME280_INACTIVE_DURATION'])
 
+    if app.config['ILLUMINANCE_SENSOR'] == 'TSL2572':
+        illuminance_sensor_class = TSL2572
+    elif app.config['ILLUMINANCE_SENSOR'] == 'TSL2561':
+        illuminance_sensor_class = TSL2561
+    else:
+        raise Exception(
+            'Unknown illuminance sensor: ', app.config['ILLUMINANCE_SENSOR']
+        )
+
     sensor = ThreadedCompositeSensor((
         bme,
-        TSL2561(app.config['TSL2561_ADDRESS'])
+        illuminance_sensor_class(app.config['ILLUMINANCE_SENSOR_ADDRESS'])
     ), lambda v: app.logger.info('sensor value.', extra=v))
 
     @app.route('/api/temperature')

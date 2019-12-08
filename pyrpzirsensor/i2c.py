@@ -438,10 +438,10 @@ class TSL2561(I2CSensorBase):
         )
 
     def set_gain(self, gain):
-        self.params(gain, self.get_time())
+        self.set_params(gain, self.get_time())
 
     def set_time(self, time_):
-        self.params(self.get_gain(), time_)
+        self.set_params(self.get_gain(), time_)
 
     def set_params(self, gain, time_):
         """set gain and time simultaneously.
@@ -452,6 +452,134 @@ class TSL2561(I2CSensorBase):
         self.write_address_single(
             1, (self.gain_bits_map[gain] << 4) | self.time_bits_map[time_]
         )
+
+    @property
+    def illuminance(self):
+        return self.get_illuminance()
+
+
+class TSL2572(I2CSensorBase):
+    """Python driver for TSL2572.
+
+    :param i2c_addr_: I2C address
+    """
+
+    gain_bits_map = util.BidirectionalMultiDict((
+        (0.16, (0x04, 0x00)), (1, (0x00, 0x00)), (8, (0x00, 0x01)),
+        (16, (0x00, 0x02)), (120, (0x00, 0x03))
+    ))
+    time_bits_map = util.BidirectionalMultiDict((
+        (50, 0xED), (200, 0xB6), (600, 0x24)
+    ))
+
+    def __init__(self, i2c_addr_):
+        super(TSL2572, self).__init__(i2c_addr_)
+
+    def read_address(self, addr_, length_):
+        return super(TSL2572, self).read_address(
+            addr_ | 0xA0, length_
+        )
+
+    def write_address(self, addr_, data_):
+        super(TSL2572, self).write_address(addr_ | 0xA0, data_)
+
+    def attributes(self):
+        return ('illuminance', )
+
+    def values(self):
+        return (self.get_illuminance(), )
+
+    def get_illuminance(self, adc=None, params=None):
+        if adc is None:
+            return self.get_illuminance(*self.get_adc())
+
+        if adc[0] == 0:
+            return 0.0
+
+        cpl = (params[0] * params[1]) / 60
+        lux1 = (adc[0] - 0.187 * adc[1]) / cpl
+        lux2 = (0.63 * adc[0] - adc[1]) / cpl
+        return max([0, lux1, lux2])
+
+    def is_valid(self):
+        d = self.read_address_single(0x13)
+        return (d & 0x01 == 1) and (((d & 0x10) >> 4) == 1)
+
+    def integrate(self, gain, time):
+        self.power_off()
+        self.set_params(gain, time)
+        self.power_on()
+        sleep(time * 0.0011)
+        while True:
+            if self.is_valid():
+                break
+            sleep(0.01)
+        self.power_off()
+        data = self.read_address(0x14, 4)
+        return ((data[1] << 8) | data[0], (data[3] << 8) | data[2])
+
+    def get_adc(self):
+        gain = 1
+        time = 200
+
+        buf = self.integrate(gain, time)
+        if max(buf) == 65535:
+            gain = 0.16
+            time = 50
+            buf = self.integrate(gain, time)
+        elif max(buf) < 100:
+            gain = 120
+            time = 600
+            buf = self.integrate(gain, time)
+        elif max(buf) < 300 :
+            gain = 120
+            time = 200
+            buf = self.integrate(gain, time)
+        elif max(buf) < 3000:
+            gain = 8
+            time = 200
+            buf = self.integrate(gain, time)
+        self.sleep()
+        return (buf, (gain, time))
+
+    def is_on(self):
+        return self.read_address_single(0) != 0x01
+
+    def power_on(self):
+        self.write_address_single(0, 0x03)
+
+    def power_off(self):
+        self.write_address_single(0, 0x01)
+
+    def sleep(self):
+        self.write_address_single(0, 0x00)
+
+    def get_gain(self):
+        return self.gain_bits_map.inverse[(
+            self.read_address_single(0x0D),
+            self.read_address_single(0x0F)
+        )]
+
+    def get_time(self):
+        return self.time_bits_map.inverse[self.read_address_single(0x01)]
+
+    def get_params(self):
+        """returns (gain, time)
+        """
+        return (
+            self.get_gain(), self.get_time()
+        )
+
+    def set_gain(self, gain):
+        self.write_address_single(0x0D, self.gain_bits_map[gain][0])
+        self.write_address_single(0x0F, self.gain_bits_map[gain][1])
+
+    def set_time(self, time_):
+        self.write_address_single(0x01, self.time_bits_map[time_])
+
+    def set_params(self, gain, time_):
+        self.set_time(time_)
+        self.set_gain(gain)
 
     @property
     def illuminance(self):
