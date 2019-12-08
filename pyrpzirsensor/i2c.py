@@ -438,10 +438,10 @@ class TSL2561(I2CSensorBase):
         )
 
     def set_gain(self, gain):
-        self.params(gain, self.get_time())
+        self.set_params(gain, self.get_time())
 
     def set_time(self, time_):
-        self.params(self.get_gain(), time_)
+        self.set_params(self.get_gain(), time_)
 
     def set_params(self, gain, time_):
         """set gain and time simultaneously.
